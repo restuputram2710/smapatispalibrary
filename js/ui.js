@@ -154,7 +154,9 @@ function skCards(n) {
 function skRows(n) { let s = '<div class="panel">'; for (let i = 0; i < (n || 6); i++) s += '<div class="row" style="padding:10px 0"><div class="sk" style="width:40px;height:56px"></div><div class="grow"><div class="sk sk-title"></div><div class="sk sk-line" style="width:40%"></div></div></div>'; return s + '</div>'; }
 function skBlock(h) { return '<div class="sk" style="height:' + (h || 120) + 'px;border-radius:8px"></div>'; }
 function empty(icon, title, text, action) {
-  return '<div class="empty"><div class="ei">' + ic(icon || 'book', 'xl') + '</div><h3>' + esc(title) + '</h3>' + (text ? '<p>' + text + '</p>' : '') + (action ? '<div class="mt16">' + action + '</div>' : '') + '</div>';
+  const art = window.FX ? '<div class="ei-m">' + FX.mascot({ size: 92, pose: icon === 'lock' || icon === 'alert' ? 'sad' : icon === 'search' ? 'read' : 'idle', label: 'Lito' }) + '<span class="eb">' + ic(icon || 'book') + '</span></div>'
+    : '<div class="ei">' + ic(icon || 'book', 'xl') + '</div>';
+  return '<div class="empty">' + art + '<h3>' + esc(title) + '</h3>' + (text ? '<p>' + text + '</p>' : '') + (action ? '<div class="mt16">' + action + '</div>' : '') + '</div>';
 }
 function errorBox(msg, retryAttr) {
   return '<div class="alert red">' + ic('alert') + '<div class="grow">' + esc(msg || 'Gagal memuat data.') + '</div>' + (retryAttr ? '<button class="btn btn-sm btn-outline" ' + retryAttr + '>' + ic('refresh', 'sm') + 'Coba lagi</button>' : '') + '</div>';

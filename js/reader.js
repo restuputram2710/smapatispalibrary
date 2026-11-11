@@ -6,30 +6,100 @@
 (function () {
 'use strict';
 const { ic, esc, $, $$, fmtN, fmtSize, api, rawCall, beacon, Session, LS } = SP;
-const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
-const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+const PDFJS_BASE = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/';
+const PDFJS = PDFJS_BASE + 'build/pdf.min.mjs';
+const PDFJS_WORKER = PDFJS_BASE + 'build/pdf.worker.min.mjs';
 
-/* ---------- IndexedDB (maks. 3 buku terakhir) ---------- */
+/* ---------- IndexedDB: buku yang pernah dibuka (maks. 8 judul / 200 MB, LRU) ---------- */
+const IDX_KEY = 'rd_idx';
 const IDB = {
-  db() { return new Promise((res, rej) => { try { const r = indexedDB.open('smapatispa', 1); r.onupgradeneeded = () => r.result.createObjectStore('buku', { keyPath: 'k' }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }); },
-  async get(k) { try { const db = await this.db(); return await new Promise(res => { const q = db.transaction('buku').objectStore('buku').get(k); q.onsuccess = () => res(q.result ? q.result.data : null); q.onerror = () => res(null); }); } catch (e) { return null; } },
+  _p: null,
+  db() {
+    return this._p || (this._p = new Promise((res, rej) => {
+      try { const r = indexedDB.open('smapatispa', 1); r.onupgradeneeded = () => r.result.createObjectStore('buku', { keyPath: 'k' }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); }
+    }).catch(e => { this._p = null; throw e; }));
+  },
+  touch(k, z) { const idx = LS.get(IDX_KEY, []).filter(x => x.k !== k); idx.unshift({ k, t: Date.now(), z: z || 0 }); LS.set(IDX_KEY, idx.slice(0, 40)); return idx; },
+  async get(k) {
+    if (!k) return null;
+    try {
+      const db = await this.db();
+      const d = await new Promise(res => { const q = db.transaction('buku').objectStore('buku').get(k); q.onsuccess = () => res(q.result ? q.result.data : null); q.onerror = () => res(null); });
+      if (d && d.byteLength) { this.touch(k, d.byteLength); return d; }
+      return null;
+    } catch (e) { return null; }
+  },
   async put(k, data) {
     try {
       const db = await this.db(), st = db.transaction('buku', 'readwrite').objectStore('buku');
       st.put({ k, t: Date.now(), data });
-      const all = await new Promise(res => { const q = st.getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); });
-      all.sort((a, b) => b.t - a.t).slice(3).forEach(x => st.delete(x.k));
+      let tot = 0; const keep = [];
+      this.touch(k, data.byteLength).forEach((x, i) => { tot += x.z; if (i === 0 || (i < 8 && tot <= 200 * 1048576)) keep.push(x); else st.delete(x.k); });
+      LS.set(IDX_KEY, keep);
     } catch (e) { /* penyimpanan penuh / diblokir — abaikan */ }
   }
 };
-let pdfjsLib = null;
-async function loadPdfJs() {
-  if (pdfjsLib) return pdfjsLib;
-  pdfjsLib = await import(PDFJS);
-  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-  return pdfjsLib;
+
+/* ---------- pdf.js: dimuat sekali, worker dipakai ulang ---------- */
+let pdfP = null, pdfWorker = null;
+function loadPdfJs() {
+  return pdfP || (pdfP = import(PDFJS).then(lib => { lib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; return lib; }).catch(e => { pdfP = null; throw e; }));
 }
-function b64ToU8(b64) { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+function getWorker(lib) { try { if (!pdfWorker || pdfWorker.destroyed) pdfWorker = new lib.PDFWorker(); } catch (e) { pdfWorker = null; } return pdfWorker; }
+/** Panaskan mesin PDF (dipanggil saat detail buku dibuka / tombol Baca disorot) */
+function warm() { loadPdfJs().then(getWorker).catch(() => {}); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function b64ToU8(b64) {
+  try { const r = await fetch('data:application/octet-stream;base64,' + b64); return new Uint8Array(await r.arrayBuffer()); }
+  catch (e) { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+}
+
+/* ---------- Pengunduh potongan: paralel, tanpa duplikat, bisa diminta per rentang ---------- */
+/* Ukuran potongan menyesuaikan koneksi: 1 MB di jaringan lambat/hemat data (halaman pertama lebih cepat), 2 MB selain itu */
+function chunkSize() {
+  const c = navigator.connection;
+  return c && (c.saveData || /(^|-)(2g|3g)$/.test(c.effectiveType || '') || (c.downlink && c.downlink < 5)) ? 1048576 : 2 * 1048576;
+}
+function makeLoader(info, CH) {
+  const n = Math.max(1, Math.ceil(info.ukuran / CH)), parts = new Array(n), inflight = new Array(n);
+  const L = { n, ch: CH, parts, done: 0, onprog: null };
+  L.put = (k, u) => { if (!parts[k]) { parts[k] = u; L.done++; if (L.onprog) L.onprog(L.done, n); } };
+  L.get = k => {
+    if (parts[k]) return Promise.resolve(parts[k]);
+    if (inflight[k]) return inflight[k];
+    return (inflight[k] = (async () => {
+      let r = null;
+      for (let t = 0; t < 3; t++) {
+        if (L.stop) throw new Error('Dibatalkan');
+        r = await rawCall('buku.potong', info.rentang ? { rt: info.rt, a: k * CH, n: CH } : { rt: info.rt, i: k });
+        if (r.success || r.code === 'RT') break;
+        await sleep(700 * (t + 1));
+      }
+      inflight[k] = null;
+      if (!r || !r.success) throw new Error(r ? r.message : 'Gagal mengunduh');
+      const u = await b64ToU8(r.data.data);
+      L.put(k, u);
+      return u;
+    })());
+  };
+  L.range = async (begin, end) => {
+    const k0 = Math.floor(begin / CH), k1 = Math.floor((end - 1) / CH), ks = [];
+    for (let k = k0; k <= k1; k++) ks.push(k);
+    const bufs = await Promise.all(ks.map(L.get)), out = new Uint8Array(end - begin);
+    let off = 0;
+    ks.forEach((k, j) => { const p = bufs[j], s0 = Math.max(0, begin - k * CH), e0 = Math.min(p.length, end - k * CH); if (e0 > s0) { out.set(p.subarray(s0, e0), off); off += e0 - s0; } });
+    return off === out.length ? out : out.subarray(0, off);
+  };
+  L.all = async workers => {
+    let i = 0;
+    const w = async () => { while (i < n && !L.stop) { const k = i++; if (!parts[k]) await L.get(k); } };
+    await Promise.all(Array.from({ length: Math.min(workers, n) }, w));
+    if (L.stop) throw new Error('Dibatalkan');
+    return L.join();
+  };
+  L.join = () => { const tot = parts.reduce((a, p) => a + p.length, 0), out = new Uint8Array(tot); let off = 0; parts.forEach(p => { out.set(p, off); off += p.length; }); return out.buffer; };
+  return L;
+}
 
 /* ===================================================================== */
 const R = { el: null, st: null };
@@ -49,36 +119,64 @@ async function open(id, onClose) {
     '<div class="r-grp"><button data-th="light" aria-label="Tema terang">' + ic('sun', 'sm') + '</button><button data-th="sepia" aria-label="Tema sepia">' + ic('sepia', 'sm') + '</button><button data-th="dark" aria-label="Tema gelap">' + ic('moon', 'sm') + '</button></div>' +
     '<button class="btn btn-soft btn-sm" data-side>' + ic('list', 'sm') + '<span class="hide-m">Daftar Isi</span></button><button class="btn-icon hide-m" data-fs aria-label="Layar penuh">' + ic('max') + '</button></div>' +
     '<div class="r-bar"><i data-bar style="width:0"></i></div>' +
-    '<div class="r-body"><div class="r-stage" data-stage tabindex="0"><div class="r-loading" data-loading><div class="box"><div class="spin" style="margin:0 auto 12px;width:28px;height:28px;color:var(--c-primary)"></div><b>Memuat buku…</b><div class="muted small mt8" data-ld>Memeriksa akses</div><div class="progress mt12"><i data-lp style="width:5%"></i></div></div></div></div>' +
+    '<div class="r-body"><div class="r-stage" data-stage tabindex="0"><div class="r-loading" data-loading><div class="box">' + (window.FX ? FX.mascot({ size: 96, pose: 'read', label: 'Lito sedang membuka buku' }) : '<div class="spin" style="margin:0 auto 12px;width:28px;height:28px;color:var(--c-primary)"></div>') + '<b>Memuat buku…</b><div class="muted small mt8" data-ld>Memeriksa akses</div><div class="progress mt12"><i data-lp style="width:5%"></i></div></div></div></div>' +
+    '<span class="r-pageload" data-pl><span class="spin" style="width:12px;height:12px"></span>Memuat halaman…</span>' +
     '<button class="r-nav prev" data-prev aria-label="Sebelumnya">' + ic('left') + '</button><button class="r-nav next" data-next aria-label="Berikutnya">' + ic('right') + '</button>' +
     '<aside class="r-side ' + (st.side ? '' : 'closed') + '"><div class="row between" style="padding:16px 16px 8px"><b style="font-size:17px">' + ic('reader') + ' Navigasi Buku</b><button class="btn-icon sm" data-side aria-label="Tutup panel">' + ic('right', 'sm') + '</button></div>' +
     '<div style="padding:0 12px"><div class="seg full" data-sidetab><button class="on" data-v="toc">Bab</button><button data-v="bm">Penanda <span data-bmn></span></button></div></div><div class="toc" data-toc></div></aside></div>' +
     '<div class="r-bottom"><span class="small muted nowrap hide-m">' + ic('clock', 'sm') + ' Sesi ini: <b data-time>0 menit</b></span><span class="mono small" data-p1>1</span><input type="range" min="1" max="1" value="1" data-slide aria-label="Geser halaman"><span class="mono small" data-pn>1</span>' +
-    '<button class="btn btn-outline btn-sm" data-bm>' + ic('bookmark', 'sm') + '<span class="hide-m">Tandai Halaman</span></button></div>';
+    '<span class="r-dl hide-m" data-dl></span><button class="btn btn-outline btn-sm" data-bm>' + ic('bookmark', 'sm') + '<span class="hide-m">Tandai Halaman</span></button></div>';
   document.body.appendChild(el);
   document.body.style.overflow = 'hidden';
   UI.segInit($('[data-sidetab]', el), v => { st.sideTab = v; renderSide(); });
   bind();
   setTheme(st.theme);
   timer();
-  // 1) buka (cek akses di server)
-  const r = await rawCall('buku.buka', { id });
+  // 1) cek salinan di perangkat, lalu buka (akses diperiksa di server; potongan pertama ikut terkirim)
+  const vKey = 'rv_' + id, vLocal = LS.get(vKey, '');
+  const cached = vLocal ? await IDB.get(vLocal) : null;
+  if (st.destroyed) return;
+  const CH = st.ch = chunkSize();
+  const r = await rawCall('buku.buka', { id, awal: 1, n0: CH, punya: cached ? vLocal : '' });
   if (st.destroyed) return;
   if (!r.success) { loadingMsg(r.message || 'Buku tidak dapat dibuka.', true); return; }
   const info = st.info = r.data;
   $('[data-title]', el).textContent = info.judul;
   if (info.format === 'LINK') { window.open(info.url, '_blank', 'noopener'); close(); UI.toast('Modul dibuka di tab baru.'); return; }
+  if (info.format !== 'EPUB') warm();                       // pdf.js diunduh bersamaan dengan berkas buku
   st.bm = LS.get('bm_' + (Session.me ? Session.me.id : 'tamu') + '_' + id, []);
-  // 2) ambil berkas (cache lokal dulu)
-  let buf = await IDB.get(info.versi);
-  if (!buf) {
-    buf = await fetchChunks(info);
-    if (!buf || st.destroyed) return;
-    IDB.put(info.versi, buf);
-  } else $('[data-ld]', el).textContent = 'Dari penyimpanan perangkat';
+  // 2) tampilkan secepatnya: dari perangkat, atau progresif (PDF besar), atau unduh penuh (EPUB / berkas kecil)
   try {
-    if (info.format === 'EPUB') await openEpub(buf); else await openPdf(buf);
-  } catch (e) { console.error(e); loadingMsg('Berkas tidak dapat ditampilkan: ' + (e && e.message ? e.message : e), true); return; }
+    if (cached && info.versi === vLocal) {
+      $('[data-ld]', el).textContent = 'Dari penyimpanan perangkat';
+      $('[data-lp]', el).style.width = '100%';
+      dlState('Tersimpan di perangkat', true);
+      if (info.format === 'EPUB') await openEpub(cached); else await openPdf({ data: new Uint8Array(cached.slice(0)) });
+    } else {
+      const L = st.loader = makeLoader(info, info.rentang ? CH : 3 * 1048576);   // backend lama: potongan tetap 3 MB
+      L.onprog = (d, n) => {
+        const pc = Math.round(d / n * 100), lp = $('[data-lp]', el), ld = $('[data-ld]', el);
+        if (lp) lp.style.width = Math.max(5, pc) + '%';
+        if (ld) ld.textContent = 'Mengunduh ' + pc + '% dari ' + fmtSize(info.ukuran);
+        if (!$('[data-loading]', el)) dlState(d < n ? 'Mengunduh ' + pc + '%' : 'Tersimpan di perangkat', d >= n);
+      };
+      if (info.d0) L.put(0, await b64ToU8(info.d0));
+      const keep = buf => { IDB.put(info.versi, buf); LS.set(vKey, info.versi); dlState('Tersimpan di perangkat', true); };
+      if (info.format !== 'EPUB' && L.n > 1) {
+        await openPdfProgressive(L, info);
+        L.all(3).then(keep).catch(() => {});                // sisa berkas diunduh di latar belakang
+      } else {
+        const buf = await L.all(3);
+        if (st.destroyed) return;
+        keep(buf);
+        if (info.format === 'EPUB') await openEpub(buf); else await openPdf({ data: new Uint8Array(buf.slice(0)) });
+      }
+    }
+  } catch (e) {
+    if (st.destroyed) return;
+    console.error(e); loadingMsg((e && e.message) || 'Berkas tidak dapat ditampilkan.', true); return;
+  }
+  if (st.destroyed) return;
   $('[data-loading]', el).remove();
   // 3) lanjutkan dari halaman terakhir
   const start = info.hal > 1 && info.hal <= st.total && info.st !== 'SELESAI' ? info.hal : 1;
@@ -87,26 +185,33 @@ async function open(id, onClose) {
   $('[data-stage]', el).focus();
 }
 
-async function fetchChunks(info) {
-  const st = R.st, n = info.potong, parts = new Array(n); let done = 0, i = 0;
-  const lp = $('[data-lp]', R.el), ld = $('[data-ld]', R.el);
-  ld.textContent = 'Mengunduh 0/' + n + ' (' + fmtSize(info.ukuran) + ')';
-  const worker = async () => {
-    while (i < n && !st.destroyed) {
-      const k = i++;
-      let r = null;
-      for (let t = 0; t < 3 && !st.destroyed; t++) { r = await rawCall('buku.potong', { rt: info.rt, i: k }); if (r.success) break; await new Promise(z => setTimeout(z, 800 * (t + 1))); }
-      if (!r || !r.success) throw new Error(r ? r.message : 'Gagal mengunduh');
-      parts[k] = b64ToU8(r.data.data); done++;
-      lp.style.width = Math.round(done / n * 100) + '%';
-      ld.textContent = 'Mengunduh ' + done + '/' + n + ' (' + fmtSize(info.ukuran) + ')';
-    }
+function dlState(txt, ok) {
+  const d = R.el && $('[data-dl]', R.el); if (!d) return;
+  d.innerHTML = txt ? (ok ? ic('checkc', 'sm') + ' ' : '') + esc(txt) : '';
+  d.style.color = ok ? 'var(--c-accent-ink)' : '';
+}
+function pageLoading(delta) {
+  const st = R.st; if (!st || !R.el) return;
+  st.pending = Math.max(0, (st.pending || 0) + delta);
+  clearTimeout(st.plT);
+  const pl = $('[data-pl]', R.el);
+  if (st.pending > 0) st.plT = setTimeout(() => pl && pl.classList.add('on'), 250); else if (pl) pl.classList.remove('on');
+}
+/* PDF progresif: halaman pertama tampil tanpa menunggu seluruh berkas */
+async function openPdfProgressive(L, info) {
+  const st = R.st, ld = $('[data-ld]', R.el);
+  if (ld) ld.textContent = 'Menyiapkan halaman pertama…';
+  const pLast = L.get(L.n - 1).catch(() => null);           // daftar isi PDF biasanya di akhir berkas
+  const lib = await loadPdfJs(), first = await L.get(0);
+  const tr = new lib.PDFDataRangeTransport(info.ukuran, first.slice());
+  tr.requestDataRange = (begin, end) => {
+    pageLoading(1);
+    L.range(begin, end).then(u => { if (!st.destroyed) tr.onDataRange(begin, u); })
+      .catch(e => { if (!st.destroyed) UI.toast('Gagal memuat sebagian buku: ' + e.message, 'err'); })
+      .finally(() => pageLoading(-1));
   };
-  try { await Promise.all([worker(), worker(), worker()].slice(0, Math.min(3, n))); }
-  catch (e) { loadingMsg(e.message || 'Gagal mengunduh buku.', true); return null; }
-  const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0)); let off = 0;
-  parts.forEach(p => { out.set(p, off); off += p.length; });
-  return out.buffer;
+  await pLast;
+  await openPdf({ range: tr, rangeChunkSize: L.ch, length: info.ukuran, disableAutoFetch: true, disableStream: true });
 }
 function loadingMsg(msg, err) {
   const box = $('[data-loading] .box', R.el); if (!box) return;
@@ -116,12 +221,14 @@ function loadingMsg(msg, err) {
 }
 
 /* ---------- PDF ---------- */
-async function openPdf(buf) {
+async function openPdf(src) {
   const st = R.st;
-  $('[data-ld]', R.el).textContent = 'Menyiapkan halaman…';
+  const ld = $('[data-ld]', R.el); if (ld && !/halaman pertama/.test(ld.textContent)) ld.textContent = 'Menyiapkan halaman…';
   const lib = await loadPdfJs();
-  st.kind = 'pdf';
-  st.pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+  st.kind = 'pdf'; st.pc = new Map();
+  st.pdf = await lib.getDocument(Object.assign({ worker: getWorker(lib) || undefined, isEvalSupported: false,
+    standardFontDataUrl: PDFJS_BASE + 'standard_fonts/', cMapUrl: PDFJS_BASE + 'cmaps/', cMapPacked: true }, src)).promise;
+  if (st.destroyed) return;
   st.total = st.pdf.numPages;
   try {
     const outline = await st.pdf.getOutline();
@@ -138,29 +245,53 @@ async function openPdf(buf) {
   if (!st.toc.length) { const n = st.total, step = Math.max(1, Math.ceil(n / 12)); for (let p = 1; p <= n; p += step) st.toc.push({ title: 'Halaman ' + p, lvl: 1, page: p }); }
   prepNav();
 }
+function pdfBox() {
+  const st = R.st, stage = $('[data-stage]', R.el), cnt = st.double && st.page + 1 <= st.total ? 2 : 1;
+  return { cnt, dpr: Math.min(window.devicePixelRatio || 1, 2), w: stage.clientWidth - (innerWidth > 1023 ? 140 : 16), h: stage.clientHeight - 56 };
+}
+/* Gambar satu halaman ke kanvas (disimpan di cache kecil agar bolak-balik halaman instan) */
+async function pageCanvas(n, box, visible) {
+  const st = R.st, key = n + '|' + box.cnt + '|' + box.w + '|' + box.h + '|' + st.zoom + '|' + box.dpr;
+  const hit = st.pc.get(key);
+  if (hit) { st.pc.delete(key); st.pc.set(key, hit); return hit; }
+  st.pcw = st.pcw || new Map();
+  if (st.pcw.has(key)) return st.pcw.get(key);              // sedang disiapkan di latar belakang
+  const job = drawCanvas(n, box, visible, key);
+  st.pcw.set(key, job);
+  try { return await job; } finally { st.pcw.delete(key); }
+}
+async function drawCanvas(n, box, visible, key) {
+  const st = R.st, page = await st.pdf.getPage(n), v1 = page.getViewport({ scale: 1 });
+  let scale = st.zoom === 'fit' ? Math.min(box.w / box.cnt / v1.width, (innerWidth > 1023 ? Math.max(box.h, 500) : 9e9) / v1.height) : st.zoom;
+  scale = Math.max(.3, scale);
+  const vp = page.getViewport({ scale: scale * box.dpr }), c = document.createElement('canvas');
+  c.width = Math.floor(vp.width); c.height = Math.floor(vp.height); c.style.width = Math.floor(vp.width / box.dpr) + 'px'; c.style.height = Math.floor(vp.height / box.dpr) + 'px';
+  c.setAttribute('aria-label', 'Halaman ' + n); c._scale = scale;
+  const task = page.render({ canvasContext: c.getContext('2d', { alpha: false }), viewport: vp, canvas: c });
+  if (visible) st.tasks.push(task);
+  await task.promise;                                       // dibatalkan → melempar galat
+  st.pc.set(key, c);
+  while (st.pc.size > 6) st.pc.delete(st.pc.keys().next().value);
+  return c;
+}
 async function renderPdf() {
   const st = R.st, stage = $('[data-stage]', R.el);
   st.tasks.forEach(t => { try { t.cancel(); } catch (e) { /* */ } }); st.tasks = [];
-  const pages = [st.page]; if (st.double && st.page + 1 <= st.total) pages.push(st.page + 1);
+  const box = pdfBox(), pages = [st.page]; if (box.cnt === 2) pages.push(st.page + 1);
   let wrap = $('.r-pages', stage);
   if (!wrap) { wrap = document.createElement('div'); wrap.className = 'r-pages'; stage.appendChild(wrap); }
-  const dpr = Math.min(window.devicePixelRatio || 1, 2), availW = stage.clientWidth - (innerWidth > 1023 ? 140 : 16), availH = stage.clientHeight - 56;
-  const canvases = pages.map(() => document.createElement('canvas'));
-  await Promise.all(pages.map(async (n, idx) => {
-    const page = await st.pdf.getPage(n), v1 = page.getViewport({ scale: 1 });
-    let scale = st.zoom === 'fit' ? Math.min(availW / pages.length / v1.width, (innerWidth > 1023 ? Math.max(availH, 500) : 9e9) / v1.height) : st.zoom;
-    scale = Math.max(.3, scale);
-    const vp = page.getViewport({ scale: scale * dpr }), c = canvases[idx];
-    c.width = Math.floor(vp.width); c.height = Math.floor(vp.height); c.style.width = Math.floor(vp.width / dpr) + 'px'; c.style.height = Math.floor(vp.height / dpr) + 'px';
-    c.setAttribute('aria-label', 'Halaman ' + n);
-    const task = page.render({ canvasContext: c.getContext('2d'), viewport: vp, canvas: c });
-    st.tasks.push(task);
-    try { await task.promise; } catch (e) { /* dibatalkan */ }
-    st.scaleNow = scale;
-  }));
-  if (st.destroyed) return;
+  const want = st.page;
+  let canvases;
+  try { canvases = await Promise.all(pages.map(n => pageCanvas(n, box, true))); }
+  catch (e) { return; }                                     // dibatalkan oleh pindah halaman
+  if (st.destroyed || want !== st.page) return;
+  st.scaleNow = canvases[0]._scale;
   wrap.replaceChildren.apply(wrap, canvases);
   $('[data-zv]', R.el).textContent = st.zoom === 'fit' ? 'Auto' : Math.round(st.zoom * 100) + '%';
+  // siapkan halaman berikutnya di latar belakang
+  const nx = st.page + box.cnt;
+  clearTimeout(st.preT);
+  st.preT = setTimeout(() => { if (!st.destroyed && nx <= st.total) for (let k = 0; k < box.cnt && nx + k <= st.total; k++) pageCanvas(nx + k, box, false).catch(() => {}); }, 180);
 }
 
 /* ---------- EPUB (bab = halaman) ---------- */
@@ -235,7 +366,7 @@ async function go(n, silent) {
   $('[data-chap]', R.el).textContent = cur ? cur.title : '';
   $$('[data-toc] a', R.el).forEach(a => a.classList.toggle('on', cur && Number(a.dataset.p) === cur.page && a.textContent.indexOf(cur.title) > -1));
   if (st.kind === 'pdf') await renderPdf(); else await renderEpub();
-  if (!silent && changed) { st.dirty = true; saveSoon(); if (last >= st.total) { save(true); UI.toast('Selamat! Anda telah menyelesaikan buku ini.'); } }
+  if (!silent && changed) { st.dirty = true; saveSoon(); if (last >= st.total) { save(true); UI.toast('Selamat! Anda telah menyelesaikan buku ini.'); if (window.FX) FX.confetti(); } }
   updateBmBtn();
 }
 function next() { const st = R.st; go(st.page + (st.double && st.kind === 'pdf' ? 2 : 1)); }
@@ -347,7 +478,7 @@ function bind() {
 }
 function close(silent) {
   const st = R.st; if (!R.el) return;
-  if (st) { st.destroyed = true; clearInterval(st.tick); clearTimeout(saveTimer); if (st.dirty || st.secs > 20) { st.dirty = true; save(true); } if (st.pdf) { try { st.pdf.destroy(); } catch (e) { /* */ } } }
+  if (st) { st.destroyed = true; if (st.loader) st.loader.stop = true; if (st.pc) st.pc.clear(); clearTimeout(st.preT); clearInterval(st.tick); clearTimeout(saveTimer); if (st.dirty || st.secs > 20) { st.dirty = true; save(true); } if (st.pdf) { try { st.pdf.destroy(); } catch (e) { /* */ } } }
   document.removeEventListener('keydown', R.onKey);
   document.removeEventListener('visibilitychange', R.onHide);
   window.removeEventListener('pagehide', R.onPageHide);
@@ -358,5 +489,7 @@ function close(silent) {
   const cb = st && st.onClose; R.st = null;
   if (!silent && cb) cb();
 }
-window.Reader = { open, close, isOpen: () => !!R.el };
+/* Panaskan pdf.js saat pengguna mengarah ke tombol baca */
+document.addEventListener('pointerover', e => { const a = e.target instanceof Element && e.target.closest('a[href^="#/baca/"]'); if (a) warm(); }, { passive: true });
+window.Reader = { open, close, warm, chunkSize, isOpen: () => !!R.el };
 })();

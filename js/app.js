@@ -210,9 +210,11 @@ async function route() {
   const o = m.route.opts;
   if (o.auth && !Session.me) { Router.go('/masuk?next=' + encodeURIComponent(m.path + SP.qsBuild(m.query)), true); return; }
   if (o.guestOnly && Session.me) { Router.go(m.query.next || '/', true); return; }
+  if (window.FX) FX.onRoute(m.path);
   if (o.bare) {
     $('#app').innerHTML = '';
     m.route.handler({ el: $('#app'), params: m.params, query: m.query, navId });
+    if (window.FX) FX.decorate($('#app'));
     lastPath = m.path; return;
   }
   renderShell();
@@ -229,6 +231,7 @@ async function route() {
   lastPath = m.path;
   try { await m.route.handler({ el: page, params: m.params, query: m.query, navId, alive: () => navId === Router.navId }); }
   catch (e) { console.error(e); page.innerHTML = UI.errorBox('Terjadi kesalahan saat menampilkan halaman: ' + e.message); }
+  if (window.FX && navId === Router.navId) FX.decorate(page);
   if (!samePage) setTimeout(() => page.classList.remove('page-enter'), 400);
 }
 App.route = route;
@@ -270,7 +273,14 @@ window.addEventListener('online', () => UI.toast('Koneksi kembali tersambung.'))
 window.addEventListener('offline', () => UI.toast('Anda sedang luring.', 'warn'));
 
 /* ---------- Mulai ---------- */
+/* Service worker: simpan kerangka aplikasi & pdf.js di perangkat agar kunjungan berikutnya instan */
+function registerSW() {
+  if (!('serviceWorker' in navigator) || !(location.protocol === 'https:' || location.hostname === 'localhost') || LS.get('no_sw', false)) return;
+  const go = () => navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (document.readyState === 'complete') setTimeout(go, 1500); else window.addEventListener('load', () => setTimeout(go, 1500), { once: true });
+}
 App.start = async function () {
+  registerSW();
   if (!SP.configured()) { showConfigError(); return; }
   if (LS.get('reduce_motion', false)) document.documentElement.classList.add('reduce-motion');
   const c = SP.cacheGet(App.bootKey());

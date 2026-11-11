@@ -8,17 +8,25 @@
 const { ic, esc, $, $$, fmtN, fmtDate, fmtRel, fmtSize, api, swr, Session, Router, LS, qsBuild } = SP;
 const page = App.page;
 
-/* ---------- Ilustrasi hero (orisinal) ---------- */
-const HERO_ART = '<svg viewBox="0 0 360 260" fill="none" aria-hidden="true">' +
-  '<rect x="18" y="18" width="324" height="224" rx="10" fill="#fff" fill-opacity=".1" stroke="#fff" stroke-opacity=".35"/>' +
-  '<circle cx="292" cy="62" r="26" fill="#B8F28F" fill-opacity=".9"/><circle cx="292" cy="62" r="40" stroke="#B8F28F" stroke-opacity=".35"/>' +
-  '<path d="M70 196V86c34-14 64-14 110 8 46-22 76-22 110-8v110c-34-14-64-14-110 8-46-22-76-22-110-8Z" fill="#fff"/>' +
-  '<path d="M180 94v110" stroke="#D9CCEA" stroke-width="2"/>' +
-  '<g stroke="#C9B7E3" stroke-width="5" stroke-linecap="round"><path d="M92 112h64M92 128h56M92 144h62M92 160h44"/><path d="M204 112h64M204 128h52M204 144h60"/></g>' +
-  '<rect x="204" y="156" width="56" height="26" rx="4" fill="#5E9E34"/><path d="m214 176 10-10 8 7 8-9 12 12" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
-  '<g transform="translate(36 150)"><rect width="58" height="14" rx="3" fill="#F2C14E"/><rect x="6" y="-15" width="50" height="14" rx="3" fill="#E87BA4"/><rect x="-2" y="-30" width="54" height="14" rx="3" fill="#B8F28F"/></g>' +
-  '<path d="M300 200c0-18 8-30 20-38-4 16-2 30 4 40" fill="#5E9E34"/><path d="M302 204c-6-14-18-20-30-20 8 8 12 16 12 24" fill="#7DBE55"/>' +
-  '<g fill="#fff"><path d="m118 52 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/><path d="m248 30 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" opacity=".7"/></g></svg>';
+/* ---------- Adegan hero interaktif (orisinal): maskot Lito di atas tumpukan buku ---------- */
+const HS_STACK = '<svg viewBox="0 0 220 74" aria-hidden="true"><rect x="6" y="50" width="208" height="22" rx="4" fill="#4F862B"/><rect x="14" y="55" width="192" height="4" rx="2" fill="#fff" opacity=".75"/><rect x="14" y="63" width="192" height="3" rx="1.5" fill="#fff" opacity=".4"/>' +
+  '<rect x="18" y="28" width="186" height="22" rx="4" fill="#E87BA4"/><rect x="26" y="33" width="170" height="4" rx="2" fill="#fff" opacity=".75"/><rect x="40" y="41" width="40" height="4" rx="2" fill="#fff" opacity=".45"/>' +
+  '<rect x="30" y="6" width="166" height="22" rx="4" fill="#F2B23A"/><rect x="38" y="11" width="150" height="4" rx="2" fill="#fff" opacity=".75"/><rect x="150" y="19" width="30" height="4" rx="2" fill="#fff" opacity=".45"/></svg>';
+const HS_BOOK = '<svg width="54" height="40" viewBox="0 0 54 40" aria-hidden="true"><path d="M3 8q12-6 24 2v28q-12-7-24-2z" fill="#fff"/><path d="M51 8q-12-6-24 2v28q12-7 24-2z" fill="#F3ECFB"/><path d="M8 15q8-3 15 1M8 21q8-3 15 1M31 16q8-4 15-1M31 22q8-4 15-1" stroke="#C9B7E3" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>';
+const HS_STAR = '<svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 1l3.6 10.4L29 15l-10.4 3.6L15 29l-3.6-10.4L1 15l10.4-3.6z" fill="#fff"/></svg>';
+const HS_LEAF = '<svg width="44" height="48" viewBox="0 0 44 48" aria-hidden="true"><path d="M22 46c0-18 6-30 18-38-3 16-1 28 4 38z" fill="#7DBE55"/><path d="M22 46C17 32 8 26 0 25c7 7 10 14 10 21z" fill="#5E9E34"/></svg>';
+function heroScene() {
+  return '<div class="hero-art hero-scene">' +
+    '<div class="hs-l" data-depth="-10" style="inset:7% 3% 9% 9%"><div class="hs-panel"></div></div>' +
+    '<div class="hs-l" data-depth="-20" style="right:6%;top:4%"><span class="hs-sun"></span></div>' +
+    '<div class="hs-l" data-depth="30" style="left:3%;top:46%"><span class="hs-float">' + HS_BOOK + '</span></div>' +
+    '<div class="hs-l" data-depth="38" style="right:4%;top:44%"><span class="hs-float f2 hs-tile">A</span></div>' +
+    '<div class="hs-l" data-depth="22" style="left:58%;top:14%"><span class="hs-float f3">' + HS_STAR + '</span></div>' +
+    '<div class="hs-l" data-depth="44" style="right:2%;bottom:6%"><span class="hs-float f4">' + HS_LEAF + '</span></div>' +
+    '<div class="hs-l" data-depth="12" style="left:27%;bottom:5%;width:56%"><div class="hs-stack">' + HS_STACK + '</div></div>' +
+    '<div class="hs-l" data-depth="8" style="left:30%;bottom:21%"><button class="hs-mascot" type="button" data-mascot data-pose="idle" aria-label="Lito, maskot perpustakaan. Ketuk untuk tips membaca">' + FX.mascot({ size: 158, track: true }) + '</button></div>' +
+    '<div class="hs-l" data-depth="5" style="left:1%;top:-5%"><div class="lito-bubble" aria-hidden="true"><span data-tip></span><i class="caret"></i></div></div></div>';
+}
 
 /* ============================== MASUK ============================== */
 function authTop(right) {
@@ -41,8 +49,8 @@ page('/masuk', ctx => {
   const s = App.settings, tgl = s.LOGIN_SISWA_TGL_LAHIR === 'on', q = ctx.query;
   SP.warmUp('pub');
   const total = (App.ref.kategori || []).reduce((a, k) => a + (k.jumlah || 0), 0);
-  ctx.el.innerHTML = '<div class="auth-page">' + authTop('<div class="row"><span class="top-chip hide-m" style="background:#fff">' + ic('shield', 'sm') + 'Akses aman warga sekolah</span><a href="#" class="btn btn-ghost" data-help>' + ic('help') + '<span class="hide-m">Bantuan</span></a></div>') +
-    '<main class="auth-main"><div style="width:min(560px,100%)"><div class="auth-card"><div class="auth-logo">' + (s.LOGO_URL ? '<img src="' + esc(s.LOGO_URL) + '" alt="">' : ic('logo', 'xl')) + '</div>' +
+  ctx.el.innerHTML = '<div class="auth-page"><div class="auth-deco" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' + authTop('<div class="row"><span class="top-chip hide-m" style="background:#fff">' + ic('shield', 'sm') + 'Akses aman warga sekolah</span><a href="#" class="btn btn-ghost" data-help>' + ic('help') + '<span class="hide-m">Bantuan</span></a></div>') +
+    '<main class="auth-main"><div style="width:min(560px,100%)"><div class="auth-card" data-card><div class="auth-mascot">' + FX.mascot({ size: 72, label: 'Lito, maskot perpustakaan' }) + '</div><div class="auth-logo">' + (s.LOGO_URL ? '<img src="' + esc(s.LOGO_URL) + '" alt="">' : ic('logo', 'xl')) + '</div>' +
     '<h1>Masuk ke Perpustakaan Digital</h1><p class="sub">' + esc(s.SCHOOL_NAME ? s.SCHOOL_NAME + ' (' + s.APP_NAME + ')' : s.APP_NAME + ' — ' + s.APP_TAGLINE) + '</p>' +
     '<div class="seg full mt24" data-seg role="tablist"><button type="button" class="' + (q.mode !== 'staf' ? 'on' : '') + '" data-v="siswa" role="tab">' + ic('idcard', 'sm') + 'Siswa (NISN)</button><button type="button" class="' + (q.mode === 'staf' ? 'on' : '') + '" data-v="staf" role="tab">' + ic('cap', 'sm') + 'Staf / Guru (Email)</button></div>' +
     '<form data-f="siswa" class="stack gap16 mt24 ' + (q.mode === 'staf' ? 'hide' : '') + '" novalidate><div class="field"><label for="nisn">Nomor Induk Siswa Nasional (NISN)</label>' +
@@ -62,8 +70,16 @@ page('/masuk', ctx => {
   UI.segInit($('[data-seg]', el), v => { $$('[data-f]', el).forEach(f => f.classList.toggle('hide', f.dataset.f !== v)); setTimeout(() => $(v === 'siswa' ? '#nisn' : '#sid', el).focus(), 50); });
   const nisn = $('#nisn', el);
   nisn.addEventListener('input', () => { nisn.value = nisn.value.replace(/\D/g, '').slice(0, 10); $('[data-cnt]', el).textContent = nisn.value.length + '/10'; });
-  $('[data-eye]', el).addEventListener('click', () => { const p = $('#spw', el); p.type = p.type === 'password' ? 'text' : 'password'; });
+  // Maskot: mata mengikuti isian, menutup mata saat kata sandi diketik
+  const lito = $('.auth-mascot .lito', el), card = $('[data-card]', el), spw = $('#spw', el);
+  const peekAt = (inp, max) => { if (/lito-(cover|peek)/.test(lito.className)) FX.pose(lito, 'idle'); FX.look(lito, -6 + 12 * Math.min(1, inp.value.length / max), 5); };
+  [[nisn, 10], [$('#sid', el), 24]].forEach(x => { ['focus', 'input'].forEach(ev => x[0].addEventListener(ev, () => peekAt(x[0], x[1]))); x[0].addEventListener('blur', () => FX.look(lito, 0, 0)); });
+  spw.addEventListener('focus', () => { FX.look(lito, 0, 0); FX.pose(lito, spw.type === 'password' ? 'cover' : 'peek'); });
+  spw.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== spw) FX.pose(lito, 'idle'); }, 120));
+  const fail = () => { FX.pose(lito, 'sad'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); setTimeout(() => FX.pose(lito, document.activeElement === spw ? 'cover' : 'idle'), 1600); };
+  $('[data-eye]', el).addEventListener('click', () => { spw.type = spw.type === 'password' ? 'text' : 'password'; FX.pose(lito, spw.type === 'password' ? 'cover' : 'peek'); spw.focus(); });
   const done = r => {
+    FX.pose(lito, 'cheer'); FX.jump(lito); FX.burst(lito, 14);
     Session.set(r.data.token, r.data.me); App.me = r.data.me; SP.cacheDrop('boot_tamu');
     UI.toast('Selamat datang, ' + r.data.me.nama.split(' ')[0] + '!');
     const next = q.next && /^\/[\w\-/?=&%.]*$/.test(q.next) ? q.next : (r.data.me.staf && !r.data.me.izin.includes('baca') ? App.adminHome() : '/');
@@ -71,11 +87,11 @@ page('/masuk', ctx => {
   };
   $('[data-f=siswa]', el).addEventListener('submit', async e => {
     e.preventDefault(); const err = $('[data-err]', e.target); err.textContent = '';
-    if (nisn.value.length !== 10) { err.textContent = 'NISN harus 10 digit angka.'; nisn.focus(); return; }
+    if (nisn.value.length !== 10) { err.textContent = 'NISN harus 10 digit angka.'; fail(); nisn.focus(); return; }
     const b = $('button.btn-primary', e.target); UI.btnBusy(b, true, 'Memeriksa NISN…');
     const r = await api('auth.siswa', { nisn: nisn.value, tgl: tgl ? $('#tgl', el).value : '' });
     UI.btnBusy(b, false);
-    if (!r.success) { err.textContent = r.message; nisn.focus(); return; }
+    if (!r.success) { err.textContent = r.message; fail(); nisn.focus(); return; }
     done(r);
   });
   $('[data-f=staf]', el).addEventListener('submit', async e => {
@@ -85,14 +101,14 @@ page('/masuk', ctx => {
     const b = $('button.btn-primary', e.target); UI.btnBusy(b, true, 'Masuk…');
     const r = await api('auth.staf', { id, sandi: pw, origin: location.origin + location.pathname });
     UI.btnBusy(b, false);
-    if (!r.success) { err.textContent = r.message; $('#spw', el).select(); return; }
+    if (!r.success) { err.textContent = r.message; fail(); $('#spw', el).select(); return; }
     done(r);
   });
   setTimeout(() => (q.mode === 'staf' ? $('#sid', el) : nisn).focus(), 400);
 }, { bare: true, guestOnly: true });
 
 page('/lupa-sandi', ctx => {
-  ctx.el.innerHTML = '<div class="auth-page">' + authTop('<a class="btn btn-outline" href="#/masuk?mode=staf">' + ic('arrowl', 'sm') + 'Kembali ke Login</a>') +
+  ctx.el.innerHTML = '<div class="auth-page"><div class="auth-deco" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' + authTop('<a class="btn btn-outline" href="#/masuk?mode=staf">' + ic('arrowl', 'sm') + 'Kembali ke Login</a>') +
     '<main class="auth-main"><div style="width:min(560px,100%)"><div class="auth-card" data-card><div class="auth-logo">' + ic('reset', 'xl') + '</div><h1>Pemulihan Kata Sandi</h1>' +
     '<p class="sub">Khusus Guru, Pustakawan, dan Tenaga Kependidikan</p><div class="alert mt24">' + ic('info') + '<div><b>Perhatian untuk Siswa:</b> akun siswa masuk menggunakan NISN tanpa kata sandi. Jika ada kendala NISN, hubungi pustakawan.</div></div>' +
     '<form class="stack gap12 mt24" novalidate><div class="field"><label for="em">Alamat email terdaftar</label><div class="inp-wrap">' + ic('mail') + '<input id="em" class="inp" type="email" autocomplete="email" placeholder="nama.guru@sekolah.sch.id" style="height:50px"></div>' +
@@ -115,7 +131,7 @@ page('/lupa-sandi', ctx => {
 
 page('/reset-sandi', ctx => {
   const t = ctx.query.t || '';
-  ctx.el.innerHTML = '<div class="auth-page">' + authTop('<a class="btn btn-outline" href="#/masuk?mode=staf">' + ic('arrowl', 'sm') + 'Ke Login</a>') +
+  ctx.el.innerHTML = '<div class="auth-page"><div class="auth-deco" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' + authTop('<a class="btn btn-outline" href="#/masuk?mode=staf">' + ic('arrowl', 'sm') + 'Ke Login</a>') +
     '<main class="auth-main"><div class="auth-card" data-card><div class="auth-logo">' + ic('key', 'xl') + '</div><h1>Buat Kata Sandi Baru</h1><p class="sub">Minimal 8 karakter, berisi huruf dan angka.</p>' +
     (t ? '<form class="stack gap16 mt24" novalidate><div class="field"><label for="p1">Kata sandi baru</label><input id="p1" class="inp" type="password" autocomplete="new-password" style="height:48px"></div>' +
       '<div class="field"><label for="p2">Ulangi kata sandi</label><input id="p2" class="inp" type="password" autocomplete="new-password" style="height:48px"></div><div class="err-text" data-err role="alert"></div>' +
@@ -144,10 +160,12 @@ function bookRowSmall(b, label) {
 }
 function shelf(items, kind) { return '<div class="shelf">' + items.map((b, i) => kind === 'h' ? UI.hCard(b) : UI.miniCard(b, i)).join('') + '</div>'; }
 function heroHtml() {
-  const s = App.settings;
-  return '<section class="hero"><div><span class="eyebrow">' + ic('sparkles', 'sm') + 'Rekomendasi ' + esc(s.KURIKULUM || '') + '</span><h1>' + esc(s.BANNER_JUDUL || 'Buku Terpopuler Bulan Ini') + '</h1>' +
-    '<p>' + esc(s.BANNER_TEKS || '') + '</p><div class="row wrap mt24" style="gap:12px"><a class="btn btn-accent btn-lg" href="#/katalog?urut=bulan">Lihat Sekarang ' + ic('arrowr', 'sm') + '</a>' +
-    '<button class="btn btn-lg btn-outline-w" data-guide>Panduan Membaca</button></div></div><div class="hero-art">' + HERO_ART + '</div></section>';
+  const s = App.settings, words = String(s.BANNER_JUDUL || 'Buku Terpopuler Bulan Ini').split(/\s+/).map((w, i) => '<span class="w" style="--i:' + i + '">' + esc(w) + '</span>').join(' ');
+  return '<section class="hero"><span class="hero-glow" aria-hidden="true"></span><span class="blob b1" aria-hidden="true"></span><span class="blob b2" aria-hidden="true"></span>' +
+    '<div class="hero-copy"><span class="eyebrow">' + ic('sparkles', 'sm') + 'Rekomendasi ' + esc(s.KURIKULUM || '') + '</span><h1 class="hero-title">' + words + '</h1>' +
+    '<p>' + esc(s.BANNER_TEKS || '') + '</p><div class="row wrap mt24" style="gap:12px"><a class="btn btn-accent btn-lg btn-shine" href="#/katalog?urut=bulan">Lihat Sekarang ' + ic('arrowr', 'sm') + '</a>' +
+    '<button class="btn btn-lg btn-outline-w" data-guide>Panduan Membaca</button></div></div>' + heroScene() +
+    '<span class="hero-mini" aria-hidden="true">' + FX.mascot({ size: 84, pose: 'wave' }) + '</span></section>';
 }
 function guideModal() {
   UI.modal({ title: 'Panduan membaca', wide: true, body: '<div class="grid2">' + [['search', 'Cari buku', 'Ketik judul, penulis, ISBN, atau materi di kolom pencarian. Saring katalog berdasarkan kategori, format, dan akses.'],
@@ -173,7 +191,7 @@ function renderBeranda(ctx) {
       (h.penulis.length ? '<section class="panel section"><div class="sec-head"><div class="sec-title"><span class="bar"></span>Penulis Teratas</div><span class="muted small hide-m">Penulis yang karyanya paling banyak dibaca</span></div><div class="authors">' + h.penulis.map(UI.authorItem).join('') + '</div></section>' : '');
     right = '<div class="rp-sec"><div class="rp-head"><h3>Warta Perpustakaan</h3><span class="btn-icon sm" style="border-color:var(--c-primary-line);background:var(--c-primary-soft);color:var(--c-primary)">' + ic('megaphone', 'sm') + '</span></div>' + annHtml(App.pengumuman) + '</div>' +
       '<div class="rp-sec"><div class="hero" style="display:block;min-height:0;padding:22px"><div class="mono xs" style="letter-spacing:.12em;color:#EADDFB">AKSES PENUH</div><h3 style="font-size:20px;margin:10px 0 8px">Masuk untuk koleksi warga sekolah</h3>' +
-      '<p style="font-size:14px">Lanjutkan bacaan, simpan favorit, dan akses buku pelajaran kelasmu.</p><a class="btn btn-accent btn-block mt16" href="#/masuk">Masuk Sekarang</a></div></div>' +
+      '<p style="font-size:14px;padding-right:46px">Lanjutkan bacaan, simpan favorit, dan akses buku pelajaran kelasmu.</p><a class="btn btn-accent btn-block mt16 btn-shine" href="#/masuk">Masuk Sekarang</a><span class="peek-m" style="bottom:62px;right:6px">' + FX.mascot({ size: 58, pose: 'wave', label: 'Lito melambai' }) + '</span></div></div>' +
       (h.rekomendasi.length ? '<div class="rp-sec"><div class="rp-head"><h3>' + ic('open') + 'Buku Rekomendasi</h3><span class="mono xs muted">Kurasi Guru</span></div>' + h.rekomendasi.map(b => bookRowSmall(b, b.guruNama ? 'Rek. ' + b.guruNama : b.katNama)).join('') + '</div>' : '') +
       '<div class="rp-sec"><div class="info-card"><b class="row">' + ic('shield', 'sm') + 'Layanan Digital 24/7</b><p class="small muted mt8">Katalog terbuka untuk semua pengunjung. Siswa memakai NISN terdaftar untuk akses penuh dari rumah.</p>' +
       '<div class="mono xs muted mt12">TA ' + esc(App.settings.TAHUN_AJARAN) + ' · Versi ' + SP.VERSION + '</div></div></div>';
@@ -195,7 +213,10 @@ function renderBeranda(ctx) {
       '<section class="section"><div class="sec-head"><div class="row"><h2 style="font-size:22px">Buku Terbaru Ditambahkan</h2><span class="badge b-purple b-mono">Terbaru</span></div><a class="link-more p" href="#/katalog?urut=terbaru">Lihat Semua ' + ic('right', 'sm') + '</a></div>' +
       (h.terbaru.length ? shelf(h.terbaru, 'h').replace('class="shelf"', 'class="shelf" style="grid-auto-columns:minmax(300px,1fr)"') : '<p class="muted">Belum ada buku.</p>') + '</section>' +
       (h.penulis && h.penulis.length ? '<section class="panel section"><div class="sec-head"><div class="sec-title"><span class="bar"></span>Penulis Teratas</div></div><div class="authors">' + h.penulis.map(UI.authorItem).join('') + '</div></section>' : '');
-    right = '<div class="rp-sec"><div class="rp-head"><h3>Pengumuman</h3><span class="mono xs muted">Pustakawan</span></div>' + annHtml(App.pengumuman) + '</div>' +
+    const jam = new Date().getHours(), salam = jam < 11 ? 'Selamat pagi' : jam < 15 ? 'Selamat siang' : jam < 18 ? 'Selamat sore' : 'Selamat malam';
+    right = '<div class="rp-sec"><div class="lito-card"><button class="lc-m" type="button" data-mascot="[data-tip2]" data-pose="idle" aria-label="Lito, maskot perpustakaan. Ketuk untuk tips">' + FX.mascot({ size: 74, track: true }) + '</button>' +
+      '<div style="min-width:0"><b>' + salam + ', ' + esc(me.nama.split(' ')[0]) + '!</b><p class="small" data-tip2></p></div></div></div>' +
+      '<div class="rp-sec"><div class="rp-head"><h3>Pengumuman</h3><span class="mono xs muted">Pustakawan</span></div>' + annHtml(App.pengumuman) + '</div>' +
       '<div class="rp-sec"><div class="rp-head"><h3>' + ic('list') + 'Buku Berikutnya</h3><span class="mono xs muted">' + h.berikutnya.length + ' Antrean</span></div>' +
       (h.berikutnya.length ? h.berikutnya.map((b, i) => bookRowSmall(b, i === 0 ? 'Prioritas 1 · ' + (b.alasan2 || '') : b.alasan2)).join('') : '<p class="small muted">Simpan buku ke favorit atau tunggu rekomendasi guru — antreanmu tampil di sini.</p>') + '</div>' +
       (Session.can('rekomendasi.kirim') && !me.tingkat ? '<div class="rp-sec"><div class="info-card"><b class="row">' + ic('sparkles', 'sm') + 'Rekomendasikan ke kelas</b><p class="small muted mt8">Buka detail buku lalu tekan <b>Rekomendasikan ke Kelas</b> untuk mengirimnya ke siswa tingkat/kelas tertentu.</p></div></div>' : '') +
@@ -203,6 +224,7 @@ function renderBeranda(ctx) {
   }
   el.innerHTML = '<div style="min-width:0">' + main + '</div><aside class="right-panel">' + right + '</aside>';
   UI.countUp(el);
+  FX.decorate(el);
   $$('[data-guide]', el).forEach(b => b.addEventListener('click', guideModal));
 }
 page('/', ctx => {
@@ -277,6 +299,7 @@ async function renderDetail(ctx) {
 }
 function drawDetail(ctx, b) {
   const el = ctx.el, me = Session.me, isPel = b.jenis === 'PELAJARAN';
+  if (b.baca && b.ada && b.format === 'PDF' && window.Reader) Reader.warm();
   const cta = b.baca && b.ada && b.format !== 'LINK' ? '<a class="btn btn-accent btn-lg btn-block" href="#/baca/' + esc(b.id) + '">' + ic('open') + (b.st === 'BACA' && b.halBaca ? 'Lanjutkan Membaca (Hal ' + b.halBaca + ')' : b.st === 'SELESAI' ? 'Baca Lagi' : 'Baca Sekarang') + '</a>' : UI.readBtn(b, 'btn-lg btn-block');
   el.innerHTML = '<div class="row between wrap mb8"><div class="crumbs" style="margin:0"><a href="#/">' + ic('home', 'sm') + ' Beranda</a>' + ic('right', 'sm') + '<a href="#/' + (isPel ? 'pelajaran' : 'katalog') + '">' + (isPel ? 'Buku Pelajaran' : 'Katalog Koleksi') + '</a>' + ic('right', 'sm') +
     (isPel && b.mapelNama ? '<a href="#/pelajaran/' + esc(b.mapel) + qsBuild({ tingkat: (b.tingkat || [])[0] }) + '">' + esc(b.mapelNama) + '</a>' : b.katNama ? '<a href="#/katalog?kategori=' + esc(b.kat) + '">' + esc(b.katNama) + '</a>' : '') + ic('right', 'sm') + '<b class="trunc" style="max-width:320px">' + esc(b.judul) + '</b></div>' +

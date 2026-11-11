@@ -24,14 +24,16 @@ Langkah lengkap untuk pemula ada di **[PANDUAN-INSTALASI.md](PANDUAN-INSTALASI.m
 ## Struktur
 
 ```
-index.html          halaman tunggal (SPA, navigasi berbasis #)
+index.html          halaman tunggal (SPA, navigasi berbasis #) + layar pembuka
+sw.js               service worker: cache tampilan, pdf.js & huruf (cepat + luring)
 css/style.css       sistem desain (ungu #6B3FA0, hijau #5E9E34, Inter + JetBrains Mono)
 js/config.js        URL backend — satu-satunya berkas yang diubah
 js/core.js          pemanggil API, cache, sesi, utilitas
+js/fx.js            animasi, efek kursor (khusus beranda) & maskot Lito
 js/ui.js            komponen (kartu buku, modal, toast, tabel, sampul)
 js/charts.js        grafik SVG (garis, batang, donat) dengan tooltip
 js/zip.js           baca/tulis ZIP, XLSX, CSV (tanpa pustaka luar)
-js/reader.js        pembaca PDF (pdf.js via CDN) & EPUB
+js/reader.js        pembaca PDF progresif (pdf.js via CDN) & EPUB, cache buku di perangkat
 js/app.js           kerangka, router, navigasi
 js/pages-anggota.js beranda, katalog, detail, buku pelajaran, koleksi, masuk
 js/pages-admin.js   panel admin

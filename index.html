@@ -7,24 +7,31 @@
   <meta name="description" content="Perpustakaan digital sekolah: baca buku, materi pelajaran per kelas, dan koleksi literasi secara daring.">
   <title>Smapatispa — Perpustakaan Digital</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%236B3FA0'/%3E%3Cpath d='M16 10v15M7 22V9.5c3-1 6-1 9 .5 3-1.5 6-1.5 9-.5V22c-3-1-6-1-9 .5-3-1.5-6-1.5-9-.5Z' fill='none' stroke='white' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <!-- Sambungan awal ke server API & CDN agar permintaan pertama lebih cepat -->
+  <link rel="preconnect" href="https://script.google.com" crossorigin>
+  <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://script.google.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=1.0.0">
+  <link rel="dns-prefetch" href="https://drive.google.com">
+  <link rel="dns-prefetch" href="https://lh3.googleusercontent.com">
+  <!-- Huruf dimuat tanpa menahan tampilan -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
+  <link rel="stylesheet" href="css/style.css?v=1.1.0">
+  <script defer src="js/config.js?v=1.1.0"></script>
+  <script defer src="js/core.js?v=1.1.0"></script>
+  <script defer src="js/fx.js?v=1.1.0"></script>
+  <script defer src="js/ui.js?v=1.1.0"></script>
+  <script defer src="js/charts.js?v=1.1.0"></script>
+  <script defer src="js/zip.js?v=1.1.0"></script>
+  <script defer src="js/reader.js?v=1.1.0"></script>
+  <script defer src="js/app.js?v=1.1.0"></script>
+  <script defer src="js/pages-anggota.js?v=1.1.0"></script>
+  <script defer src="js/pages-admin.js?v=1.1.0"></script>
 </head>
 <body>
   <noscript><p style="padding:24px;font-family:sans-serif">Aktifkan JavaScript untuk memakai perpustakaan digital ini.</p></noscript>
-  <div id="app" class="app"></div>
-  <script src="js/config.js?v=1.0.0"></script>
-  <script src="js/core.js?v=1.0.0"></script>
-  <script src="js/ui.js?v=1.0.0"></script>
-  <script src="js/charts.js?v=1.0.0"></script>
-  <script src="js/zip.js?v=1.0.0"></script>
-  <script src="js/reader.js?v=1.0.0"></script>
-  <script src="js/app.js?v=1.0.0"></script>
-  <script src="js/pages-anggota.js?v=1.0.0"></script>
-  <script src="js/pages-admin.js?v=1.0.0"></script>
-  <script>App.start();</script>
+  <div id="app" class="app"><div class="splash" role="status" aria-live="polite"><span class="lito lito-wave" style="--sz:116px" aria-hidden="true"><svg viewBox="0 0 200 222" aria-hidden="true" focusable="false"><ellipse class="l-shadow" cx="100" cy="214" rx="54" ry="6"/><g class="l-all"><g class="l-wing l-wing-l"><path d="M42 108C18 120 10 160 32 184c9-18 15-46 16-74z"/><path class="l-dk" d="M42 108C18 120 10 160 32 184c3-6 5-12 7-20-12-16-11-38 3-56z"/></g><g class="l-wing l-wing-r"><path d="M158 108c24 12 32 52 10 76-9-18-15-46-16-74z"/><path class="l-dk" d="M158 108c24 12 32 52 10 76-3-6-5-12-7-20 12-16 11-38-3-56z"/></g><path class="l-tuft" d="M56 64 44 22l36 26z"/><path class="l-tuft" d="M144 64l12-42-36 26z"/><path class="l-body" d="M100 38c48 0 70 40 70 90 0 52-32 80-70 80s-70-28-70-80c0-50 22-90 70-90z"/><ellipse class="l-belly" cx="100" cy="154" rx="46" ry="44"/><path class="l-scal" d="M76 142q6 7 12 0M94 142q6 7 12 0M112 142q6 7 12 0M85 157q6 7 12 0M103 157q6 7 12 0"/><circle class="l-face" cx="74" cy="94" r="31"/><circle class="l-face" cx="126" cy="94" r="31"/><circle class="l-eye" cx="74" cy="94" r="20"/><circle class="l-eye" cx="126" cy="94" r="20"/><g class="l-pupils"><circle cx="74" cy="96" r="9.5"/><circle cx="126" cy="96" r="9.5"/><circle class="l-hl" cx="77.5" cy="92" r="3"/><circle class="l-hl" cx="129.5" cy="92" r="3"/></g><circle class="l-lid" cx="74" cy="94" r="21.5"/><circle class="l-lid" cx="126" cy="94" r="21.5"/><g class="l-glass"><circle cx="74" cy="94" r="24"/><circle cx="126" cy="94" r="24"/><path d="M97 90q3-5 6 0"/></g><path class="l-beak" d="M100 106l-8 8 8 12 8-12z"/><path class="l-beak2" d="M92 114l8 12 8-12z"/><ellipse class="l-cheek" cx="52" cy="120" rx="8" ry="5"/><ellipse class="l-cheek" cx="148" cy="120" rx="8" ry="5"/><g class="l-cap"><path class="l-cap-b" d="M78 44v13c15 8 29 8 44 0V44l-22 9z"/><path class="l-cap-t" d="M54 40 100 21l46 19-46 19z"/><circle class="l-cap-k" cx="100" cy="40" r="3.2"/><g class="l-tassel"><path d="M100 40l34 6v17" fill="none"/><rect x="130.5" y="60" width="7" height="12" rx="2"/></g></g><g class="l-book"><path class="l-bk" d="M52 172l48 7 48-7v32l-48 7-48-7z"/><path class="l-pg" d="M57 167q23-7 43 7v30q-20-11-43-4z"/><path class="l-pg" d="M143 167q-23-7-43 7v30q20-11 43-4z"/><path class="l-ln" d="M65 178q14-3 27 3M65 187q14-3 27 3M108 181q13-6 27-3M108 190q13-6 27-3"/><ellipse class="l-grip" cx="52" cy="188" rx="9" ry="12"/><ellipse class="l-grip" cx="148" cy="188" rx="9" ry="12"/></g><ellipse class="l-foot" cx="84" cy="208" rx="9" ry="4"/><ellipse class="l-foot" cx="116" cy="208" rx="9" ry="4"/><g class="l-hands"><g class="l-hand l-hand-l"><path d="M42 114c-4-30 22-48 56-38 6 15 1 31-9 39-15 7-33 7-47-1z"/><path class="l-ft" d="M54 104l12 6M60 94l14 8M70 86l12 8"/></g><g class="l-hand l-hand-r"><path d="M158 114c4-30-22-48-56-38-6 15-1 31 9 39 15 7 33 7 47-1z"/><path class="l-ft" d="M146 104l-12 6M140 94l-14 8M130 86l-12 8"/></g></g></g></svg></span><b>Memuat perpustakaan…</b><span class="splash-bar"><i></i></span></div></div>
+  <script>document.addEventListener('DOMContentLoaded', function () { App.start(); });</script>
 </body>
 </html>

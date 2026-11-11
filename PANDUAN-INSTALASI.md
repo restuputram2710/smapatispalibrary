@@ -116,7 +116,7 @@ Setelah selesai mencoba, jalankan **`hapusDataContoh`** — semua buku dan akun 
 ✅ Berhasil bila URL tersebut, saat dibuka di tab browser baru, menampilkan teks seperti:
 
 ```json
-{"success":true,"app":"Smapatispa Digital Library API","v":"1.0.0","siap":true, …}
+{"success":true,"app":"Smapatispa Digital Library API","v":"1.1.0","siap":true, …}
 ```
 
 Kalau `"siap": false`, berarti `setupAplikasi` belum berhasil dijalankan — ulangi Tahap A4.
@@ -133,11 +133,13 @@ Kalau `"siap": false`, berarti `setupAplikasi` belum berhasil dijalankan — ula
    ├── index.html
    ├── README.md
    ├── PANDUAN-INSTALASI.md
+   ├── sw.js              ← penyimpan cache di perangkat (agar cepat & bisa luring)
    ├── css/
    │   └── style.css
    └── js/
        ├── config.js      ← satu-satunya berkas yang perlu Anda ubah
        ├── core.js, ui.js, app.js, charts.js, zip.js, reader.js
+       ├── fx.js          ← animasi, efek kursor & maskot Lito
        ├── pages-anggota.js
        └── pages-admin.js
    ```
@@ -248,7 +250,7 @@ Catatan per perintah:
 4. Tunggu 1–2 menit, muat ulang halaman. Akan muncul: **"Your site is live at https://namapengguna.github.io/perpustakaan/"**.
 5. Centang **Enforce HTTPS** bila tersedia.
 
-✅ Berhasil bila alamat tersebut menampilkan beranda perpustakaan berwarna ungu-hijau dengan banner "Buku Terpopuler Bulan Ini".
+✅ Berhasil bila alamat tersebut menampilkan beranda perpustakaan berwarna ungu-hijau dengan banner "Buku Terpopuler Bulan Ini" dan maskot burung hantu **Lito** di sebelah kanannya.
 
 ---
 
@@ -350,6 +352,8 @@ Aplikasi dirancang untuk 100–300 pengguna per hari dan 50–100 pengguna aktif
 
    Dengan cara ini **URL `/exec` tetap sama**, sehingga `config.js` tidak perlu diubah. (Jangan membuat "Deployment baru" lagi — itu menghasilkan URL berbeda.)
 
+> ⚠️ **Perbarui backend dan tampilan bersamaan.** Versi 1.1 memakai cara unduh buku yang lebih cepat; tampilan baru tetap bisa membaca dengan backend lama, tetapi kecepatan penuh baru terasa setelah `Kode.gs` versi 1.1 diterapkan sebagai **Versi baru**.
+
 **Frontend (bila ada berkas tampilan baru):** salin berkas baru ke folder `smapatispa-web` (timpa yang lama, **kecuali `js/config.js`** milik Anda), lalu dari folder itu:
 
 ```bash
@@ -358,7 +362,9 @@ git commit -m "Pembaruan tampilan"
 git push
 ```
 
-Tunggu 1–2 menit. Bila masih tampil versi lama, tekan **Ctrl+Shift+R** atau buka di jendela Incognito.
+Tunggu 1–2 menit. Aplikasi menyimpan tampilannya di perangkat (service worker) — pengguna otomatis mendapat versi baru pada kunjungan berikutnya. Bila masih tampil versi lama, tekan **Ctrl+Shift+R** atau buka di jendela Incognito.
+
+> 🛠️ **Bila Anda sendiri mengubah berkas CSS/JS** (selain `config.js`): naikkan angka versi di **tiga tempat** agar perangkat pengguna mengambil berkas baru — `?v=1.1.0` di `index.html` (semua baris), `const VERSI = '1.1.0'` di `sw.js`, dan `const VERSION = '1.1.0'` di `js/core.js` (misalnya menjadi `1.1.1`).
 
 ---
 
@@ -366,7 +372,21 @@ Tunggu 1–2 menit. Bila masih tampil versi lama, tekan **Ctrl+Shift+R** atau bu
 
 - **Berkas buku tidak pernah dibagikan publik.** Pembaca mengambil isi buku lewat API setelah hak aksesnya diperiksa (token baca berlaku 3 jam). Jangan mengubah setelan berbagi folder *Berkas Buku*.
 - **Sampul & logo** dibagikan "siapa saja yang memiliki tautan (lihat)" agar bisa tampil di halaman. Bila domain Google Workspace sekolah melarang berbagi publik, sampul akan diganti otomatis dengan sampul warna yang dibuat aplikasi (tetap rapi), dan logo tidak tampil — minta admin Workspace mengizinkan berbagi tautan untuk folder *Sampul* dan *Gambar & Logo*.
-- **Pembaca buku** mendukung PDF (pdf.js, dimuat dari CDN jsDelivr) dan EPUB (pembaca bawaan, tanpa pustaka tambahan): navigasi halaman/bab, daftar isi, penanda, tema terang/sepia/gelap, zoom, mode 1–2 halaman, layar penuh, dan progres yang tersimpan otomatis. Buku yang pernah dibuka disimpan sementara di perangkat sehingga pembukaan berikutnya lebih cepat.
+- **Pembaca buku** mendukung PDF (pdf.js, dimuat dari CDN jsDelivr) dan EPUB (pembaca bawaan, tanpa pustaka tambahan): navigasi halaman/bab, daftar isi, penanda, tema terang/sepia/gelap, zoom, mode 1–2 halaman, layar penuh, dan progres yang tersimpan otomatis.
+- **Kecepatan membaca (v1.1):**
+  - PDF besar **tampil progresif**: halaman pertama muncul tanpa menunggu seluruh berkas, sisanya diunduh di latar belakang.
+  - Potongan pertama ikut terkirim saat buku dibuka, sehingga ada satu perjalanan ke server yang terhemat.
+  - Ukuran potongan menyesuaikan sinyal: 1 MB di jaringan lambat atau hemat data, 2 MB selain itu.
+  - Halaman berikutnya disiapkan lebih dulu, jadi membalik halaman terasa instan.
+  - Hingga 8 buku terakhir (maks. 200 MB) disimpan di perangkat, sehingga membuka ulang buku tidak perlu mengunduh lagi.
+
+  Uji pada koneksi 4 Mbps dengan PDF 9 MB: halaman pertama tampil ±3,6 detik (unduhan penuh ±27 detik), dan buka ulang ±0,3 detik.
+- **Kecepatan memuat aplikasi:** semua skrip dimuat tanpa menahan tampilan, dan layar pembuka bermaskot langsung muncul. *Service worker* (`sw.js`) menyimpan tampilan, pdf.js, dan huruf di perangkat, sehingga kunjungan berikutnya terbuka hampir seketika. Aplikasi juga tetap terbuka saat luring dengan data terakhir.
+- **Animasi & maskot:**
+  - Efek kursor (cincin, percikan, sorotan) **hanya aktif di Beranda** dan hanya di perangkat dengan mouse. Di sana mata maskot Lito mengikuti kursor, dan Lito bisa diketuk untuk melihat tips.
+  - Di halaman masuk, Lito menutup mata saat kata sandi diketik.
+  - Lain-lain: kartu buku miring 3D, riak tombol, konfeti saat selesai membaca.
+  - Semua animasi otomatis mati bila perangkat/pengguna memilih **kurangi animasi** (Pengaturan → Tampilan).
 - **Cadangan data**: di Google Sheets, **File → Buat salinan** secara berkala (mis. tiap akhir semester).
 
 ---
@@ -402,11 +422,12 @@ Tunggu 1–2 menit. Bila masih tampil versi lama, tekan **Ctrl+Shift+R** atau bu
 | Unggah berkas gagal di tengah jalan | Koneksi terputus / berkas > batas | Ulangi unggah; periksa batas MB di Identitas → Keamanan & batas (maks. 45) |
 | Pesan "Drive API has not been used in project…" saat unggah/membaca buku | Drive API belum aktif di proyek | Editor → **Layanan (+)** → pilih **Drive API** → Tambahkan, lalu coba lagi |
 | Data baru dari sheet tidak muncul | Cache server (maks. 15 menit) | Panel Admin → Status Sistem → **Segarkan cache**, atau jalankan `kosongkanCache` |
-| Situs tampil versi lama | Cache browser | **Ctrl+Shift+R** atau jendela Incognito |
+| Situs tampil versi lama | Cache browser / service worker | **Ctrl+Shift+R** atau jendela Incognito; bila Anda mengubah CSS/JS sendiri, naikkan angka versi (Bagian J) |
+| Halaman PDF lama muncul / "Memuat halaman…" lama | Sinyal lemah | Tunggu sebentar — halaman yang sedang dibaca diprioritaskan; setelah unduhan selesai muncul tanda "✓ Tersimpan di perangkat" dan buku bisa dibuka ulang tanpa internet |
 | `Password authentication is not supported` saat `git push` | GitHub menolak sandi akun | Gunakan Personal Access Token (D6) |
 | `remote origin already exists` | Perintah remote sudah pernah dijalankan | Lewati, langsung `git push -u origin main` |
 | `src refspec main does not match any` | Belum ada commit | `git add .` lalu `git commit -m "Upload pertama"` dulu |
 
 ---
 
-*Smapatispa Digital Library v1.0.0 — backend Google Apps Script (REST API), frontend HTML/CSS/JS murni di GitHub Pages.*
+*Smapatispa Digital Library v1.1.0 — backend Google Apps Script (REST API), frontend HTML/CSS/JS murni di GitHub Pages.*
